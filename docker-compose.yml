@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  dev-db:
+    image: mysql:latest
+    container_name: mre-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword-mre
+      MYSQL_DATABASE: mre_db
+      MYSQL_USER: mre_user
+      MYSQL_PASSWORD: mre_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    
+volumes:
+  mysql-data:

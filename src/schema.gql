@@ -1,0 +1,60 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type User {
+  """Example field (placeholder)"""
+  id: Int!
+  email: String!
+  firstname: String
+  lastname: String
+  role: Role!
+}
+
+enum Role {
+  ADMIN
+  RESPONSABLE
+  AGENT
+}
+
+type AuthResponse {
+  accessToken: String!
+  user: User!
+}
+
+type Query {
+  me: User!
+  user: User!
+}
+
+type Mutation {
+  createUser(createUserInput: CreateUserInput!): User!
+  updateUser(updateUserInput: UpdateUserInput!): User!
+  removeUser(id: Int!): User!
+  signup(signupInput: SignupInput!): AuthResponse!
+  signin(signinInput: SigninInput!): AuthResponse!
+}
+
+input CreateUserInput {
+  email: String!
+  password: String!
+  role: Role
+}
+
+input UpdateUserInput {
+  email: String
+  password: String
+  role: Role
+  firstname: String
+  lastname: String!
+}
+
+input SignupInput {
+  email: String!
+  password: String!
+}
+
+input SigninInput {
+  email: String!
+  password: String!
+}

@@ -1,0 +1,11 @@
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": MySQL database "mre_db" at "localhost:3307"
+
+
+⚠️  Warnings for the current datasource:
+
+  • The values [RESPOMSABLE] on the enum `users_role` will be removed. If these variants are still used in the database, this will fail.
+
+[?25l[2K[1G[36m?[39m [1mAre you sure you want to create and apply this migration?[22m [90m»[39m [90m(y/N)[39m[2K[1G[2K[1G[32m√[39m [1mAre you sure you want to create and apply this migration?[22m [90m...[39m no
+[?25hMigration cancelled.
