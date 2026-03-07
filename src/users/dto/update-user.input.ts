@@ -11,7 +11,6 @@ import {
 export class UpdateUserInput extends PartialType(
   CreateUserInput,
 ) {
-  
   @Field({ nullable: true })
   @IsOptional()
   firstname?: string;

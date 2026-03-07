@@ -58,13 +58,24 @@ export class UsersResolver {
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
   @Mutation(() => User, { name: 'removeUser' })
-  removeUser(@Args('id', { type: () => Int }) targetUserId: number) {
+  removeUser(
+    @Args('id', { type: () => Int })
+    targetUserId: number,
+  ) {
     return this.usersService.remove(targetUserId);
   }
 
-
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
   @Query(() => User, { name: 'user' })
-  findOne(@GetUser('id') userId: number) {
-    return this.usersService.findOne(userId);
+  findOne(@Args('id', {type: () => Int }) id: number) {
+    return this.usersService.findOne(id);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @Query(() => [User], { name: 'users' })
+  findAll(@Args('role', { nullable: true }) role?: Role) {
+    return this.usersService.findAll(role);
   }
 }

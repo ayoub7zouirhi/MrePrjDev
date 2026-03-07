@@ -1,8 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateUserInput } from './dto/create-user.input';
 import { UpdateUserInput } from './dto/update-user.input';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as argon2 from 'argon2';
+import { Role } from 'src/auth/enums';
 
 @Injectable()
 export class UsersService {
@@ -48,24 +52,28 @@ export class UsersService {
   }
 
   async remove(userId: number) {
-    const user = await this.prisma.user.delete({
+    const user = this.prisma.user.delete({
       where: { id: userId },
     });
-    return (
-      'User with id ' +
-      user.id +
-      ' has been removed.'
-    );
+    if (!userId) {
+      throw new NotFoundException(
+        `User with ID not found`,
+      );
+    }
+    return user;
   }
 
   async findOne(userId: number) {
-      const user = await this.prisma.user.findUnique({
+    const user =
+      await this.prisma.user.findUnique({
         where: { id: userId },
       });
-      return user;
-      }
-      
-    findAll() {
-      return this.prisma.user.findMany();
-    }
+    return user;
   }
+
+  async findAll(role: Role) {
+    return this.prisma.user.findMany({
+      where: role ? { role } : {},
+    });
+  }
+}

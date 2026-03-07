@@ -11,6 +11,7 @@ type User {
   role: Role!
 }
 
+"""The user roles for authorization"""
 enum Role {
   ADMIN
   RESPONSABLE
@@ -24,7 +25,8 @@ type AuthResponse {
 
 type Query {
   me: User!
-  user: User!
+  user(id: Int!): User!
+  users(role: String): [User!]!
 }
 
 type Mutation {
