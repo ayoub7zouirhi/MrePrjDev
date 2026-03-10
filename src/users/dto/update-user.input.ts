@@ -5,6 +5,7 @@ import {
   Field,
   PartialType,
 } from '@nestjs/graphql';
+import { Role } from '@prisma/client';
 
 @InputType()
 export class UpdateUserInput extends PartialType(
@@ -17,4 +18,8 @@ export class UpdateUserInput extends PartialType(
   @IsOptional()
   @Field()
   lastname?: string;
+
+  @IsOptional()
+  @Field()
+  role?: Role;
 }

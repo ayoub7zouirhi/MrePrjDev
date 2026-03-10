@@ -31,12 +31,26 @@ type Environment {
   description: String
 }
 
+type Lead {
+  id: Int!
+  firstName: String
+  lastName: String
+  email: String
+  phone: String!
+  status: String!
+  source: String!
+  environmentId: Int
+  agentId: Int
+}
+
 type Query {
   me: User!
   user(id: Int!): User!
   users(role: String): [User!]!
   environments: [Environment!]!
   environment(id: Int!): Environment!
+  leads: [Lead!]!
+  leadByEnv(leadId: Int!): Lead!
 }
 
 type Mutation {
@@ -48,6 +62,9 @@ type Mutation {
   createEnvironment(createEnvironmentInput: CreateEnvironmentInput!): Environment!
   updateEnvironment(updateEnvironmentInput: UpdateEnvironmentInput!): Environment!
   removeEnvironment(id: Int!): Environment!
+  createLead(createLeadInput: CreateLeadInput!): Lead!
+  updateLead(updateLeadInput: UpdateLeadInput!, id: Int!): Lead!
+  removeLead(id: Int!): Lead!
 }
 
 input CreateUserInput {
@@ -60,7 +77,7 @@ input CreateUserInput {
 input UpdateUserInput {
   email: String
   password: String
-  role: Role
+  role: String!
   environment: Int
   firstname: String
   lastname: String!
@@ -85,4 +102,23 @@ input UpdateEnvironmentInput {
   name: String
   description: String
   id: Int!
+}
+
+input CreateLeadInput {
+  firstName: String!
+  lastName: String!
+  email: String
+  phone: String!
+  status: String!
+  source: String!
+}
+
+input UpdateLeadInput {
+  firstName: String
+  lastName: String
+  email: String
+  phone: String
+  status: String
+  source: String
+  agentId: Int
 }

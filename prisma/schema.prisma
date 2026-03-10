@@ -20,15 +20,41 @@ enum Role {
   AGENT
 }
 
+model Lead {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  firstName String?
+  lastName  String?
+  email     String?
+  phone     String
+
+  status String @default("NEW")
+  source String
+
+  lastCallRecordUrl String? @db.Text
+  aiSummary         String? @db.Text
+
+  environmentId Int
+  environment   Environment @relation(fields: [environmentId], references: [id])
+
+  agentId Int?
+  agent   User? @relation(fields: [agentId], references: [id])
+
+  @@map("leads")
+}
+
 model Environment {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  name        String
+  name        String 
   description String?
 
   users User[]
+  leads Lead[]
 
   @@map("environments")
 }
@@ -47,6 +73,7 @@ model User {
   role          Role         @default(AGENT)
   environmentId Int?
   environment   Environment? @relation(fields: [environmentId], references: [id])
+  lead          Lead[]
 
   @@map("users")
 }
