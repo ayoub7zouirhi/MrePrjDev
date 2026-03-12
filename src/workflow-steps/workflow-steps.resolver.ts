@@ -78,8 +78,13 @@ export class WorkflowStepsResolver {
 
   @Mutation(() => WorkflowStep)
   removeWorkflowStep(
-    @Args('id', { type: () => Int }) id: number,
+    @Args('id', { type: () => Int })
+    removeStep: number,
+    @CurrentEnv() envId?: number,
   ) {
-    return this.workflowStepsService.remove(id);
+    return this.workflowStepsService.remove(
+      removeStep,
+      envId,
+    );
   }
 }

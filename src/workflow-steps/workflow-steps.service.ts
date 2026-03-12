@@ -29,6 +29,7 @@ export class WorkflowStepsService {
       await this.prisma.workflowStep.findFirst({
         where: {
           name: createWorkflowStepInput.name,
+          environmentId: envId,
         },
       });
     if (stepNameExist) {
@@ -117,9 +118,13 @@ export class WorkflowStepsService {
       await this.prisma.workflowStep.findFirst({
         where: {
           name: updateWorkflowStepInput.name,
+          environmentId: envId,
         },
       });
-    if (stepNameExist) {
+    if (
+      stepNameExist &&
+      stepNameExist?.id !== stepId
+    ) {
       throw new NotFoundException(
         `Workflow Step Name: ${updateWorkflowStepInput.name} already exist `,
       );
@@ -135,7 +140,35 @@ export class WorkflowStepsService {
     });
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} workflowStep`;
+  async remove(
+    removeStep: number,
+    envId: number,
+  ) {
+    const envIdExist =
+      await this.prisma.environment.findUnique({
+        where: { id: envId },
+      });
+    if (!envIdExist) {
+      throw new NotFoundException(
+        `Environment ID: ${envId} does not exist`,
+      );
+    }
+    const stepIdExist =
+      await this.prisma.workflowStep.findUnique({
+        where: {
+          id: removeStep,
+        },
+      });
+    if (!stepIdExist) {
+      throw new NotFoundException(
+        `Workflow Step ID: ${removeStep} does not exist `,
+      );
+    }
+    return await this.prisma.workflowStep.delete({
+      where: {
+        id: removeStep,
+      },
+    });
+    
   }
 }

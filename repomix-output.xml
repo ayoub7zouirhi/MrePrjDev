@@ -55,6 +55,7 @@ prisma/migrations/20260307221909_add_super_admin_role/migration.sql
 prisma/migrations/20260309110258_add_leads_model/migration.sql
 prisma/migrations/20260309154240_add_leads_fields/migration.sql
 prisma/migrations/20260310201017_add_lead_history/migration.sql
+prisma/migrations/20260311152047_add_workflow_steps/migration.sql
 prisma/migrations/migration_lock.toml
 prisma/schema.prisma
 README.md
@@ -102,6 +103,12 @@ src/users/entities/user.entity.ts
 src/users/users.module.ts
 src/users/users.resolver.ts
 src/users/users.service.ts
+src/workflow-steps/dto/create-workflow-step.input.ts
+src/workflow-steps/dto/update-workflow-step.input.ts
+src/workflow-steps/entities/workflow-step.entity.ts
+src/workflow-steps/workflow-steps.module.ts
+src/workflow-steps/workflow-steps.resolver.ts
+src/workflow-steps/workflow-steps.service.ts
 test/app.e2e-spec.ts
 test/jest-e2e.json
 tsconfig.build.json
@@ -832,6 +839,37 @@ ALTER TABLE `lead_histories` ADD CONSTRAINT `lead_histories_leadId_fkey` FOREIGN
 
 -- AddForeignKey
 ALTER TABLE `lead_histories` ADD CONSTRAINT `lead_histories_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+</file>
+
+<file path="prisma/migrations/20260311152047_add_workflow_steps/migration.sql">
+/*
+  Warnings:
+
+  - You are about to drop the column `status` on the `leads` table. All the data in the column will be lost.
+
+*/
+-- AlterTable
+ALTER TABLE `leads` DROP COLUMN `status`,
+    ADD COLUMN `stepId` INTEGER NULL;
+
+-- CreateTable
+CREATE TABLE `workflow_steps` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(191) NOT NULL,
+    `color` VARCHAR(191) NULL,
+    `order` INTEGER NOT NULL,
+    `isFinal` BOOLEAN NOT NULL DEFAULT false,
+    `environmentId` INTEGER NOT NULL,
+
+    UNIQUE INDEX `workflow_steps_name_environmentId_key`(`name`, `environmentId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- AddForeignKey
+ALTER TABLE `workflow_steps` ADD CONSTRAINT `workflow_steps_environmentId_fkey` FOREIGN KEY (`environmentId`) REFERENCES `environments`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `leads` ADD CONSTRAINT `leads_stepId_fkey` FOREIGN KEY (`stepId`) REFERENCES `workflow_steps`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 </file>
 
 <file path="prisma/migrations/migration_lock.toml">
@@ -1700,6 +1738,360 @@ import { UsersResolver } from './users.resolver';
 export class UsersModule {}
 </file>
 
+<file path="src/workflow-steps/dto/create-workflow-step.input.ts">
+import { InputType, Int, Field } from '@nestjs/graphql';
+import { IsNotEmpty, IsOptional } from 'class-validator';
+
+@InputType()
+export class CreateWorkflowStepInput {
+
+  @IsNotEmpty({ message: 'Name is required' })
+  @Field()
+  name: string;
+
+  @IsOptional()
+  @Field({ nullable: true })
+  color?: string;
+
+  @IsNotEmpty({ message: 'Order is required' })
+  @Field(() => Int)
+  order: number;
+
+  @IsOptional()
+  @Field()
+  isFinal?: boolean;
+
+}
+</file>
+
+<file path="src/workflow-steps/dto/update-workflow-step.input.ts">
+import { IsOptional } from 'class-validator';
+import { CreateWorkflowStepInput } from './create-workflow-step.input';
+import {
+  InputType,
+  Field,
+  Int,
+  PartialType,
+} from '@nestjs/graphql';
+
+@InputType()
+export class UpdateWorkflowStepInput extends PartialType(
+  CreateWorkflowStepInput,
+) {
+  @IsOptional()
+  @Field(() => Int, { nullable: true })
+  id?: number;
+}
+</file>
+
+<file path="src/workflow-steps/entities/workflow-step.entity.ts">
+import {
+  ObjectType,
+  Field,
+  Int,
+} from '@nestjs/graphql';
+
+@ObjectType()
+export class WorkflowStep {
+  @Field(() => Int)
+  id: number;
+
+  @Field()
+  name: string;
+
+  @Field({ nullable: true })
+  color?: string;
+
+  @Field(() => Int)
+  order: number;
+
+  @Field()
+  isFinal: boolean;
+
+  @Field(() => Int)
+  environmentId: number;
+}
+</file>
+
+<file path="src/workflow-steps/workflow-steps.module.ts">
+import { Module } from '@nestjs/common';
+import { WorkflowStepsService } from './workflow-steps.service';
+import { WorkflowStepsResolver } from './workflow-steps.resolver';
+
+@Module({
+  providers: [WorkflowStepsResolver, WorkflowStepsService],
+})
+export class WorkflowStepsModule {}
+</file>
+
+<file path="src/workflow-steps/workflow-steps.resolver.ts">
+import {
+  Resolver,
+  Query,
+  Mutation,
+  Args,
+  Int,
+} from '@nestjs/graphql';
+import { WorkflowStepsService } from './workflow-steps.service';
+import { WorkflowStep } from './entities/workflow-step.entity';
+import { CreateWorkflowStepInput } from './dto/create-workflow-step.input';
+import { UpdateWorkflowStepInput } from './dto/update-workflow-step.input';
+import { GqlAuthGuard } from 'src/auth/guard/gql-auth.guard';
+import { RolesGuard } from 'src/auth/guard/roles.guard';
+import { UseGuards } from '@nestjs/common';
+import {
+  CurrentEnv,
+  Roles,
+} from 'src/auth/decorator';
+import { Role } from '@prisma/client';
+
+@UseGuards(GqlAuthGuard, RolesGuard)
+@Roles(Role.SUPER_ADMIN, Role.ADMIN)
+@Resolver(() => WorkflowStep)
+export class WorkflowStepsResolver {
+  constructor(
+    private readonly workflowStepsService: WorkflowStepsService,
+  ) {}
+
+  @Mutation(() => WorkflowStep)
+  createWorkflowStep(
+    @Args('createWorkflowStepInput')
+    createWorkflowStepInput: CreateWorkflowStepInput,
+    @CurrentEnv() envId: number,
+  ) {
+    return this.workflowStepsService.create(
+      createWorkflowStepInput,
+      envId,
+    );
+  }
+
+  @Query(() => [WorkflowStep], {
+    name: 'workflowSteps',
+  })
+  findAll(@CurrentEnv() envId: number) {
+    return this.workflowStepsService.findAll(
+      envId,
+    );
+  }
+
+  @Query(() => WorkflowStep, {
+    name: 'workflowStep',
+  })
+  findOne(
+    @Args('id', { type: () => Int })
+    stepId: number,
+    @CurrentEnv() envId?: number,
+  ) {
+    return this.workflowStepsService.findOne(
+      stepId,
+      envId,
+    );
+  }
+
+  @Mutation(() => WorkflowStep)
+  updateWorkflowStep(
+    @Args('updateWorkflowStepInput')
+    updateWorkflowStepInput: UpdateWorkflowStepInput,
+    @Args('id', { type: () => Int })
+    stepId: number,
+    @CurrentEnv() envId?: number,
+  ) {
+    return this.workflowStepsService.update(
+      updateWorkflowStepInput,
+      stepId,
+      envId,
+    );
+  }
+
+  @Mutation(() => WorkflowStep)
+  removeWorkflowStep(
+    @Args('id', { type: () => Int })
+    removeStep: number,
+    @CurrentEnv() envId?: number,
+  ) {
+    return this.workflowStepsService.remove(
+      removeStep,
+      envId,
+    );
+  }
+}
+</file>
+
+<file path="src/workflow-steps/workflow-steps.service.ts">
+import {
+  Injectable,
+  NotFoundException,
+  UseGuards,
+} from '@nestjs/common';
+import { CreateWorkflowStepInput } from './dto/create-workflow-step.input';
+import { UpdateWorkflowStepInput } from './dto/update-workflow-step.input';
+import { GqlAuthGuard } from 'src/auth/guard/gql-auth.guard';
+import { RolesGuard } from 'src/auth/guard/roles.guard';
+import { PrismaService } from 'src/prisma/prisma.service';
+
+@Injectable()
+export class WorkflowStepsService {
+  constructor(private prisma: PrismaService) {}
+  async create(
+    createWorkflowStepInput: CreateWorkflowStepInput,
+    envId: number,
+  ) {
+    const envIdExist =
+      await this.prisma.environment.findUnique({
+        where: { id: envId },
+      });
+    if (!envIdExist) {
+      throw new NotFoundException(
+        `Environment ID: ${envId} does not exist`,
+      );
+    }
+    const stepNameExist =
+      await this.prisma.workflowStep.findFirst({
+        where: {
+          name: createWorkflowStepInput.name,
+        },
+      });
+    if (stepNameExist) {
+      throw new NotFoundException(
+        `Workflow Step Name: ${createWorkflowStepInput.name} already exist `,
+      );
+    }
+    return await this.prisma.workflowStep.create({
+      data: {
+        ...createWorkflowStepInput,
+        environmentId: envId,
+      },
+    });
+  }
+
+  async findAll(envId: number) {
+    const envIdExist =
+      await this.prisma.environment.findUnique({
+        where: { id: envId },
+      });
+    if (!envIdExist) {
+      throw new NotFoundException(
+        `Environment ID: ${envId} does not exist`,
+      );
+    }
+    return this.prisma.workflowStep.findMany({
+      where: {
+        environmentId: envId,
+      },
+    });
+  }
+
+  async findOne(stepId: number, envId?: number) {
+    const envIdExist =
+      await this.prisma.environment.findUnique({
+        where: { id: envId },
+      });
+    if (!envIdExist) {
+      throw new NotFoundException(
+        `Environment ID: ${envId} does not exist`,
+      );
+    }
+    const stepIdExist =
+      await this.prisma.workflowStep.findFirst({
+        where: {
+          id: stepId,
+          ...(envId !== undefined && {
+            environmentId: envId,
+          }),
+        },
+      });
+    if (!stepIdExist) {
+      throw new NotFoundException(
+        `Workflow Step ID: ${stepId} does not exist in Environment ID: ${envId} or does not exist at all `,
+      );
+    }
+    return stepIdExist;
+  }
+
+  async update(
+    updateWorkflowStepInput: UpdateWorkflowStepInput,
+    stepId: number,
+    envId: number,
+  ) {
+    const envIdExist =
+      await this.prisma.environment.findUnique({
+        where: { id: envId },
+      });
+    if (!envIdExist) {
+      throw new NotFoundException(
+        `Environment ID: ${envId} does not exist`,
+      );
+    }
+    const stepIdExist =
+      await this.prisma.workflowStep.findUnique({
+        where: {
+          id: stepId,
+        },
+      });
+    if (!stepIdExist) {
+      throw new NotFoundException(
+        `Workflow Step ID: ${stepId} does not exist `,
+      );
+    }
+    const stepNameExist =
+      await this.prisma.workflowStep.findFirst({
+        where: {
+          name: updateWorkflowStepInput.name,
+        },
+      });
+    if (
+      stepNameExist &&
+      stepNameExist?.id !== stepId
+    ) {
+      throw new NotFoundException(
+        `Workflow Step Name: ${updateWorkflowStepInput.name} already exist `,
+      );
+    }
+
+    return await this.prisma.workflowStep.update({
+      where: {
+        id: stepId,
+      },
+      data: {
+        ...updateWorkflowStepInput,
+      },
+    });
+  }
+
+  async remove(
+    removeStep: number,
+    envId: number,
+  ) {
+    const envIdExist =
+      await this.prisma.environment.findUnique({
+        where: { id: envId },
+      });
+    if (!envIdExist) {
+      throw new NotFoundException(
+        `Environment ID: ${envId} does not exist`,
+      );
+    }
+    const stepIdExist =
+      await this.prisma.workflowStep.findUnique({
+        where: {
+          id: removeStep,
+        },
+      });
+    if (!stepIdExist) {
+      throw new NotFoundException(
+        `Workflow Step ID: ${removeStep} does not exist `,
+      );
+    }
+    return await this.prisma.workflowStep.delete({
+      where: {
+        id: removeStep,
+      },
+    });
+    
+  }
+}
+</file>
+
 <file path="test/app.e2e-spec.ts">
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -1919,6 +2311,131 @@ export class Lead {
 }
 </file>
 
+<file path="src/main.ts">
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
+import { PrismaExceptionFilter } from './prisma-exception.filter';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+  app.useGlobalFilters(
+    new PrismaExceptionFilter(),
+  );
+  await app.listen(3000);
+}
+bootstrap();
+</file>
+
+<file path="src/users/dto/create-user.input.ts">
+import {
+  InputType,
+  Field,
+  Int,
+} from '@nestjs/graphql';
+import {
+  IsEmail,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  MinLength,
+} from 'class-validator';
+import { Role } from 'src/auth/enums';
+
+@InputType()
+export class CreateUserInput {
+  @IsEmail(
+    {},
+    { message: 'Invalid email address' },
+  )
+  @IsNotEmpty()
+  @Field()
+  email: string;
+
+  @Field()
+  @IsNotEmpty()
+  @MinLength(6, {
+    message:
+      'Password must be at least 6 characters long',
+  })
+  password: string;
+
+  @Field(() => Role, { nullable: true })
+  @IsEnum(Role)
+  @IsOptional()
+  role?: Role;
+
+  @IsInt()
+  @IsOptional()
+  @Field(() => Int, { nullable: true })
+  environment?: number;
+}
+</file>
+
+<file path="src/users/entities/user.entity.ts">
+import {
+  ObjectType,
+  Field,
+  Int,
+} from '@nestjs/graphql';
+import { Role } from 'src/auth/enums';
+
+@ObjectType()
+export class User {
+  @Field(() => Int, {
+    description: 'Example field (placeholder)',
+  })
+  id: number;
+
+  @Field()
+  email: string;
+
+  @Field({ nullable: true })
+  firstname?: string;
+
+  @Field({ nullable: true })
+  lastname?: string;
+
+  @Field(() => Role)
+  role: Role;
+
+  @Field(() => Int, { nullable: true })
+  environmentId?: number;
+}
+</file>
+
+<file path="src/environments/dto/update-environment.input.ts">
+import { CreateEnvironmentInput } from './create-environment.input';
+import {
+  InputType,
+  Field,
+  Int,
+  PartialType,
+} from '@nestjs/graphql';
+
+@InputType()
+export class UpdateEnvironmentInput extends PartialType(
+  CreateEnvironmentInput,
+) {
+  @Field(() => Int)
+  id: number;
+
+  @Field({ nullable: true })
+  name?: string;
+
+  @Field({ nullable: true })
+  description?: string;
+}
+</file>
+
 <file path="src/leads/leads.service.ts">
 import {
   BadRequestException,
@@ -2069,8 +2586,10 @@ export class LeadsService {
         'Lead ID is required',
       );
     }
-    const existingLead = await this.prisma.lead.findUnique({
-      where: { id: leadId },})
+    const existingLead =
+      await this.prisma.lead.findUnique({
+        where: { id: leadId },
+      });
 
     const whereClause: any = { id: leadId };
 
@@ -2098,17 +2617,17 @@ export class LeadsService {
         histories: {
           create: {
             action: `Updated lead ${leadId}`,
-            oldValue: dataToUpdate.status ,
-            newValue: dataToUpdate.status ,
+            oldValue: dataToUpdate.status,
+            newValue: dataToUpdate.status,
             userId: user.id,
           },
         },
       },
       include: {
-        histories :{
+        histories: {
           orderBy: { createdAt: 'desc' },
-        }
-      }
+        },
+      },
     });
   }
 
@@ -2132,131 +2651,6 @@ export class LeadsService {
       },
     });
   }
-}
-</file>
-
-<file path="src/main.ts">
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
-import { PrismaExceptionFilter } from './prisma-exception.filter';
-
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-  app.useGlobalFilters(
-    new PrismaExceptionFilter(),
-  );
-  await app.listen(3000);
-}
-bootstrap();
-</file>
-
-<file path="src/users/dto/create-user.input.ts">
-import {
-  InputType,
-  Field,
-  Int,
-} from '@nestjs/graphql';
-import {
-  IsEmail,
-  IsEnum,
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  MinLength,
-} from 'class-validator';
-import { Role } from 'src/auth/enums';
-
-@InputType()
-export class CreateUserInput {
-  @IsEmail(
-    {},
-    { message: 'Invalid email address' },
-  )
-  @IsNotEmpty()
-  @Field()
-  email: string;
-
-  @Field()
-  @IsNotEmpty()
-  @MinLength(6, {
-    message:
-      'Password must be at least 6 characters long',
-  })
-  password: string;
-
-  @Field(() => Role, { nullable: true })
-  @IsEnum(Role)
-  @IsOptional()
-  role?: Role;
-
-  @IsInt()
-  @IsOptional()
-  @Field(() => Int, { nullable: true })
-  environment?: number;
-}
-</file>
-
-<file path="src/users/entities/user.entity.ts">
-import {
-  ObjectType,
-  Field,
-  Int,
-} from '@nestjs/graphql';
-import { Role } from 'src/auth/enums';
-
-@ObjectType()
-export class User {
-  @Field(() => Int, {
-    description: 'Example field (placeholder)',
-  })
-  id: number;
-
-  @Field()
-  email: string;
-
-  @Field({ nullable: true })
-  firstname?: string;
-
-  @Field({ nullable: true })
-  lastname?: string;
-
-  @Field(() => Role)
-  role: Role;
-
-  @Field(() => Int, { nullable: true })
-  environmentId?: number;
-}
-</file>
-
-<file path="src/environments/dto/update-environment.input.ts">
-import { CreateEnvironmentInput } from './create-environment.input';
-import {
-  InputType,
-  Field,
-  Int,
-  PartialType,
-} from '@nestjs/graphql';
-
-@InputType()
-export class UpdateEnvironmentInput extends PartialType(
-  CreateEnvironmentInput,
-) {
-  @Field(() => Int)
-  id: number;
-
-  @Field({ nullable: true })
-  name?: string;
-
-  @Field({ nullable: true })
-  description?: string;
 }
 </file>
 
@@ -2395,45 +2789,6 @@ export class UsersService {
     });
   }
 }
-</file>
-
-<file path="src/app.module.ts">
-import { Module } from '@nestjs/common';
-import { GraphQLModule } from '@nestjs/graphql';
-import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
-import { join } from 'path';
-import { UsersModule } from './users/users.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { ConfigModule } from '@nestjs/config';
-import { AuthModule } from './auth/auth.module';
-import { EnvironmentsModule } from './environments/environments.module';
-import { LeadsModule } from './leads/leads.module';
-
-@Module({
-  imports: [
-    GraphQLModule.forRoot<ApolloDriverConfig>({
-      driver: ApolloDriver,
-      autoSchemaFile: join(process.cwd(), 'src/schema.gql'), 
-      playground: true, 
-      context: ({ req }) => {
-        const envId = req.headers['x-environment-id'];
-        return {
-          req,
-          environmentId: envId ? parseInt(envId as string, 10) : null,
-        }
-      }
-    }),
-    ConfigModule.forRoot({
-      isGlobal: true, 
-    }),
-    UsersModule,
-    PrismaModule,
-    AuthModule,
-    EnvironmentsModule,
-    LeadsModule,
-  ],
-})
-export class AppModule {}
 </file>
 
 <file path="src/environments/environments.service.ts">
@@ -2607,106 +2962,45 @@ export class UsersResolver {
 }
 </file>
 
-<file path="prisma/schema.prisma">
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+<file path="src/app.module.ts">
+import { Module } from '@nestjs/common';
+import { GraphQLModule } from '@nestjs/graphql';
+import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
+import { join } from 'path';
+import { UsersModule } from './users/users.module';
+import { PrismaModule } from './prisma/prisma.module';
+import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from './auth/auth.module';
+import { EnvironmentsModule } from './environments/environments.module';
+import { LeadsModule } from './leads/leads.module';
+import { WorkflowStepsModule } from './workflow-steps/workflow-steps.module';
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
-}
-
-enum Role {
-  SUPER_ADMIN
-  ADMIN
-  RESPONSABLE
-  AGENT
-}
-
-model LeadHistory {
-id Int @id @default(autoincrement())
-createdAt DateTime @default(now())
-
-action String
-oldValue String? 
-newValue String? 
-
-leadId Int 
-lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
-
-userId Int? 
-user User? @relation(fields: [userId], references: [id])
-
-@@map("lead_histories")
-
-}
-
-model Lead {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  firstName String?
-  lastName  String?
-  email     String?
-  phone     String
-
-  status String @default("NEW")
-  source String
-
-  lastCallRecordUrl String? @db.Text
-  aiSummary         String? @db.Text
-
-  environmentId Int
-  environment   Environment @relation(fields: [environmentId], references: [id])
-
-  agentId Int?
-  agent   User? @relation(fields: [agentId], references: [id])
-
-  histories LeadHistory[]
-  @@map("leads")
-}
-
-model Environment {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  name        String
-  description String?
-
-  users User[]
-  leads Lead[]
-
-  @@map("environments")
-}
-
-model User {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  email String @unique
-  hash  String
-
-  firstname String?
-  lastname  String?
-
-  role          Role         @default(AGENT)
-  environmentId Int?
-  environment   Environment? @relation(fields: [environmentId], references: [id])
-  tbdel         Lead[]
-
-  leadHistories LeadHistory[]
-  @@map("users")
-}
+@Module({
+  imports: [
+    GraphQLModule.forRoot<ApolloDriverConfig>({
+      driver: ApolloDriver,
+      autoSchemaFile: join(process.cwd(), 'src/schema.gql'), 
+      playground: true, 
+      context: ({ req }) => {
+        const envId = req.headers['x-environment-id'];
+        return {
+          req,
+          environmentId: envId ? parseInt(envId as string, 10) : null,
+        }
+      }
+    }),
+    ConfigModule.forRoot({
+      isGlobal: true, 
+    }),
+    UsersModule,
+    PrismaModule,
+    AuthModule,
+    EnvironmentsModule,
+    LeadsModule,
+    WorkflowStepsModule,
+  ],
+})
+export class AppModule {}
 </file>
 
 <file path="src/users/dto/update-user.input.ts">
@@ -2734,6 +3028,128 @@ export class UpdateUserInput extends PartialType(
   @IsOptional()
   @Field(() => Role, { nullable: true })
   role?: Role;
+}
+</file>
+
+<file path="prisma/schema.prisma">
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  RESPONSABLE
+  AGENT
+}
+
+model WorkflowStep {
+  id      Int     @id @default(autoincrement())
+  name    String
+  color   String?
+  order   Int
+  isFinal Boolean @default(false)
+
+  environmentId Int
+  environment   Environment @relation(fields: [environmentId], references: [id])
+
+  leads Lead[]
+
+  @@unique([name, environmentId])
+  @@map("workflow_steps")
+}
+
+model LeadHistory {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  action   String
+  oldValue String?
+  newValue String?
+
+  leadId Int
+  lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  userId Int?
+  user   User? @relation(fields: [userId], references: [id])
+
+  @@map("lead_histories")
+}
+
+model Lead {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  firstName String?
+  lastName  String?
+  email     String?
+  phone     String
+
+  source String
+
+  stepId Int?
+  step   WorkflowStep? @relation(fields: [stepId], references: [id])
+
+  lastCallRecordUrl String? @db.Text
+  aiSummary         String? @db.Text
+
+  environmentId Int
+  environment   Environment @relation(fields: [environmentId], references: [id])
+
+  agentId Int?
+  agent   User? @relation(fields: [agentId], references: [id])
+
+  histories LeadHistory[]
+
+  @@map("leads")
+}
+
+model Environment {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name        String
+  description String?
+
+  users         User[]
+  leads         Lead[]
+  workflowSteps WorkflowStep[]
+
+  @@map("environments")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  email String @unique
+  hash  String
+
+  firstname String?
+  lastname  String?
+
+  role          Role         @default(AGENT)
+  environmentId Int?
+  environment   Environment? @relation(fields: [environmentId], references: [id])
+  tbdel         Lead[]
+
+  leadHistories LeadHistory[]
+
+  @@map("users")
 }
 </file>
 
@@ -2798,6 +3214,15 @@ type Lead {
   histories: [LeadHistory!]
 }
 
+type WorkflowStep {
+  id: Int!
+  name: String!
+  color: String
+  order: Int!
+  isFinal: Boolean!
+  environmentId: Int!
+}
+
 type Query {
   me: User!
   user(id: Int!): User!
@@ -2806,6 +3231,8 @@ type Query {
   environment(id: Int!): Environment!
   leads: [Lead!]!
   leadByEnv(leadId: Int!): Lead!
+  workflowSteps: [WorkflowStep!]!
+  workflowStep(id: Int!): WorkflowStep!
 }
 
 type Mutation {
@@ -2820,6 +3247,9 @@ type Mutation {
   createLead(createLeadInput: CreateLeadInput!): Lead!
   updateLead(updateLeadInput: UpdateLeadInput!, id: Int!): Lead!
   removeLead(id: Int!): Lead!
+  createWorkflowStep(createWorkflowStepInput: CreateWorkflowStepInput!): WorkflowStep!
+  updateWorkflowStep(updateWorkflowStepInput: UpdateWorkflowStepInput!, id: Int!): WorkflowStep!
+  removeWorkflowStep(id: Int!): WorkflowStep!
 }
 
 input CreateUserInput {
@@ -2876,6 +3306,21 @@ input UpdateLeadInput {
   status: String
   source: String
   agentId: Int
+}
+
+input CreateWorkflowStepInput {
+  name: String!
+  color: String
+  order: Int!
+  isFinal: Boolean!
+}
+
+input UpdateWorkflowStepInput {
+  name: String
+  color: String
+  order: Int
+  isFinal: Boolean
+  id: Int
 }
 </file>
 
