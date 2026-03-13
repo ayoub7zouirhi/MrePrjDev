@@ -16,27 +16,6 @@ export class WorkflowStepsService {
     createWorkflowStepInput: CreateWorkflowStepInput,
     envId: number,
   ) {
-    const envIdExist =
-      await this.prisma.environment.findUnique({
-        where: { id: envId },
-      });
-    if (!envIdExist) {
-      throw new NotFoundException(
-        `Environment ID: ${envId} does not exist`,
-      );
-    }
-    const stepNameExist =
-      await this.prisma.workflowStep.findFirst({
-        where: {
-          name: createWorkflowStepInput.name,
-          environmentId: envId,
-        },
-      });
-    if (stepNameExist) {
-      throw new NotFoundException(
-        `Workflow Step Name: ${createWorkflowStepInput.name} already exist `,
-      );
-    }
     return await this.prisma.workflowStep.create({
       data: {
         ...createWorkflowStepInput,

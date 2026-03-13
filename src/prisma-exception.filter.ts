@@ -3,6 +3,8 @@ import {
   Catch,
   ArgumentsHost,
   BadRequestException,
+  ConflictException,
+  NotFoundException,
 } from '@nestjs/common';
 import { GqlArgumentsHost } from '@nestjs/graphql';
 import { Prisma } from '@prisma/client';
@@ -18,17 +20,22 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     let message = 'Database error';
 
     if (exception.code === 'P2002') {
-      message = `Unique constraint failed on: ${exception.meta?.target}`;
+      throw new ConflictException(
+        `Unique constraint failed on: ${exception.meta?.target}`,
+      );
     }
 
     if (exception.code === 'P2003') {
-      message = `Invalid reference on field: ${exception.meta?.field_name}`;
+      throw new BadRequestException(
+        `Invalid reference on field: ${exception.meta?.field_name}`,
+      );
     }
 
     if (exception.code === 'P2025') {
-      message = `Record not found`;
+      throw new NotFoundException(
+        `Record not found in the database`,
+      );
     }
-
     throw new BadRequestException(message);
   }
 }

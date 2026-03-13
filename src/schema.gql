@@ -116,7 +116,7 @@ type Mutation {
   createChecklistItem(createChecklistItemInput: CreateChecklistItemInput!): ChecklistItem!
   updateChecklistItem(updateChecklistItemInput: UpdateChecklistItemInput!): ChecklistItem!
   removeChecklistItem(id: Int!): ChecklistItem!
-  toggleLeadCheckList(createLeadChecklistResponseInput: CreateLeadChecklistResponseInput!): LeadChecklistResponse!
+  toggleLeadCheckListResponses(createLeadChecklistResponseInput: CreateLeadChecklistResponseInput!): LeadChecklistResponse!
   removeLeadChecklistResponse(id: Int!): LeadChecklistResponse!
 }
 

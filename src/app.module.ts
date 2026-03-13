@@ -19,10 +19,11 @@ import { LeadChecklistResponsesModule } from './lead-checklist-responses/lead-ch
       autoSchemaFile: join(process.cwd(), 'src/schema.gql'), 
       playground: true, 
       context: ({ req }) => {
-        const envId = req.headers['x-environment-id'];
+        const envIdRaw = req.headers['x-environment-id'];
+        const envId = envIdRaw ? parseInt(envIdRaw as string, 10) : null;
         return {
           req,
-          environmentId: envId ? parseInt(envId as string, 10) : null,
+          environmentId: isNaN(envId) ? null : envId,
         }
       }
     }),
