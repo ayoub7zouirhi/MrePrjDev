@@ -25,12 +25,12 @@ export class LeadChecklistResponsesResolver {
 
   @Roles(Role.ADMIN, Role.SUPER_ADMIN, Role.AGENT)
   @Mutation(() => LeadChecklistResponse)
-  toggleLeadCheckList(
+  toggleLeadCheckListResponses(
     @Args('createLeadChecklistResponseInput')
     createLeadChecklistResponseInput: CreateLeadChecklistResponseInput,
     @CurrentEnv() envId: number,
   ) {
-    return this.leadChecklistResponsesService.toggleCheckList(
+    return this.leadChecklistResponsesService.toggleCheckListResponses(
       createLeadChecklistResponseInput,
       envId,
     );

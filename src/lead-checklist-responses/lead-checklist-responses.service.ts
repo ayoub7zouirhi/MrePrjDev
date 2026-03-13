@@ -1,15 +1,15 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { CreateLeadChecklistResponseInput } from './dto/create-lead-checklist-response.input';
-import { UpdateLeadChecklistResponseInput } from './dto/update-lead-checklist-response.input';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class LeadChecklistResponsesService {
   constructor(private prisma: PrismaService) {}
-  async toggleCheckList(
+  async toggleCheckListResponses(
     input: CreateLeadChecklistResponseInput,
     envId: number,
   ) {
@@ -19,11 +19,24 @@ export class LeadChecklistResponsesService {
           id: input.leadId,
           environmentId: envId,
         },
+        include: { step: true },
       });
 
     if (!leadExists) {
       throw new NotFoundException(
-        'Lead introuvable ou accès refusé',
+        'Lead not Found',
+      );
+    }
+    const validateChecklistItem =
+      await this.prisma.checklistItem.findFirst({
+        where: {
+          id: input.checklistItemId,
+          stepId: leadExists.step.id,
+        },
+      });
+    if (!validateChecklistItem) {
+      throw new BadRequestException(
+        'Invalid Checklist Item for this Lead',
       );
     }
     return this.prisma.leadChecklistResponse.upsert(

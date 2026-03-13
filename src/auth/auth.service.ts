@@ -3,6 +3,7 @@ import { SigninInput } from './dto/signin.dto';
 import {
   Injectable,
   ForbiddenException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { SignupInput } from './dto/signup.dto.';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -12,7 +13,6 @@ import {
 } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { ConfigService } from '@nestjs/config';
-import { hash } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -64,7 +64,9 @@ export class AuthService {
       signinInput.password,
     );
     if (!pwMatch) {
-      throw new Error('Invalid credentials');
+      throw new UnauthorizedException(
+        'Invalid credentials',
+      );
     }
     const tokenObj = await this.singinToken(
       user.id,
@@ -101,9 +103,5 @@ export class AuthService {
       jwtOptions,
     );
     return { accessToken: token };
-  }
-
-  findAll() {
-    return 'users';
   }
 }
